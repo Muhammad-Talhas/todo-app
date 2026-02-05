@@ -5,7 +5,6 @@ from ...database import get_session
 from ...models.task import Task, TaskCreate, TaskRead, TaskUpdate, TaskPatch
 from .auth import get_current_user 
 from ...models.user import User
-from src.models.user import User
 
 router = APIRouter()
 
@@ -29,7 +28,6 @@ def toggle_task(user_id: str, task_id: int, session: Session = Depends(get_sessi
     task = session.get(Task, task_id)
     
     if not task or task.user_id != user_id:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Task not found")
 
     # Flip the completed status
@@ -46,7 +44,6 @@ def delete_task(user_id: str, task_id: int, session: Session = Depends(get_sessi
     task = session.get(Task, task_id)
     
     if not task or task.user_id != user_id:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Task not found")
 
     session.delete(task)
