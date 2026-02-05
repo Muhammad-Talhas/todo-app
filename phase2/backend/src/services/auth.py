@@ -67,14 +67,22 @@ def get_user_from_token(session: Session, token: str) -> Optional[User]:
     user = session.exec(statement).first()
     return user
 
-def create_user(session: Session, user_create: UserCreate) -> User:
+def create_user(session: Session, user_create: UserCreate, is_oauth_user: bool = False) -> User:
     """Create a new user with hashed password."""
-    hashed_password = get_password_hash(user_create.password)
-    db_user = User(
-        email=user_create.email,
-        name=user_create.name,
-        password_hash=hashed_password
-    )
+    # For OAuth users, we don't hash an empty password
+    if is_oauth_user:
+        db_user = User(
+            email=user_create.email,
+            name=user_create.name,
+            password_hash=""  # OAuth users don't have passwords
+        )
+    else:
+        hashed_password = get_password_hash(user_create.password)
+        db_user = User(
+            email=user_create.email,
+            name=user_create.name,
+            password_hash=hashed_password
+        )
     session.add(db_user)
     session.commit()
     session.refresh(db_user)

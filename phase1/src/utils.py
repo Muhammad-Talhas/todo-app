@@ -1,5 +1,7 @@
 """Input validation and formatting helpers for Phase I Todo Application"""
 
+from datetime import datetime
+
 
 def validate_title(title: str) -> bool:
     """Validate that task title is non-empty.
@@ -23,6 +25,34 @@ def validate_task_id(task_id: int) -> bool:
         True if valid, False otherwise
     """
     return isinstance(task_id, int) and task_id > 0
+
+
+def validate_priority(priority: str) -> bool:
+    """Validate that priority is one of the allowed values.
+
+    Args:
+        priority: Priority level to validate
+
+    Returns:
+        True if valid, False otherwise
+    """
+    return priority in ["low", "medium", "high"]
+
+
+def validate_datetime(date_str: str) -> bool:
+    """Validate that date string is in the correct format.
+
+    Args:
+        date_str: Date string to validate
+
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        datetime.strptime(date_str, "%d-%m-%Y %H:%M")
+        return True
+    except ValueError:
+        return False
 
 
 def format_task(task) -> str:
@@ -54,3 +84,51 @@ def format_task_list(tasks) -> str:
         output.append(format_task(task))
 
     return "\n".join(output)
+
+
+def format_task_statistics(stats: dict) -> str:
+    """Format task statistics for display.
+
+    Args:
+        stats: Dictionary with task statistics
+
+    Returns:
+        Formatted string representation of statistics
+    """
+    return f"""Task Statistics:
+- Total tasks: {stats['total']}
+- Completed: {stats['completed']}
+- Pending: {stats['pending']}
+- Overdue: {stats['overdue']}
+- Completion Rate: {(stats['completed']/stats['total']*100) if stats['total'] > 0 else 0:.1f}%"""
+
+
+def format_priority(priority: str) -> str:
+    """Format priority level with emoji.
+
+    Args:
+        priority: Priority level (low, medium, high)
+
+    Returns:
+        Formatted priority with emoji
+    """
+    priority_emojis = {
+        "high": "🔴 High",
+        "medium": "🟡 Medium",
+        "low": "🟢 Low"
+    }
+    return priority_emojis.get(priority, priority)
+
+
+def format_tags(tags: list) -> str:
+    """Format list of tags for display.
+
+    Args:
+        tags: List of tags
+
+    Returns:
+        Formatted string representation of tags
+    """
+    if not tags:
+        return "(no tags)"
+    return ", ".join(tags)

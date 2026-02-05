@@ -15,7 +15,7 @@ const SignupPage: React.FC = () => {
   const [passwordError, setPasswordError] = useState('');
 
   const router = useRouter();
-  const { signup } = useAuth();
+  const { signup, oauthLogin } = useAuth();
 
   const validateForm = () => {
     let isValid = true;
@@ -63,14 +63,18 @@ const SignupPage: React.FC = () => {
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    // Placeholder for social login functionality
-    if (provider === 'GitHub') {
-      // GitHub OAuth login logic would go here
-      alert('GitHub OAuth login clicked');
-    } else if (provider === 'Google') {
-      // Google OAuth login logic would go here
-      alert('Google OAuth login clicked');
+  const handleSocialLogin = async (provider: string) => {
+    // Handle social login with Better Auth
+    try {
+      if (provider === 'GitHub') {
+        // Use Better Auth client for GitHub OAuth
+        await oauthLogin('github');
+      } else if (provider === 'Google') {
+        // Use Better Auth client for Google OAuth
+        await oauthLogin('google');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred during social login');
     }
   };
 

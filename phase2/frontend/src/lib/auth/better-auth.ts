@@ -1,67 +1,46 @@
-// Simple authentication client for the Todo application
-// Using a basic implementation compatible with Next.js 16
+import { betterAuth } from "better-auth";
+import { jwt } from "better-auth/plugins";
+import { Pool } from "pg";
 
-import { useState, useEffect } from 'react';
+export const auth = betterAuth({
+  secret: process.env.BETTER_AUTH_SECRET,
+  // Use a fallback to localhost to ensure cookies work in dev
+  baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL || "http://localhost:3000",
+  
+  database: new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // Common fix for Supabase/Neon SSL errors
+  }),
 
-// Mock authentication functions for development
-export const signIn = async (email: string, password: string) => {
-  // In a real implementation, this would call your backend API
-  const response = await fetch('/api/auth/signin', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (response.ok) {
-    const data = await response.json();
-    localStorage.setItem('authToken', data.token);
-    return data;
-  } else {
-    throw new Error('Sign in failed');
-  }
-};
-
-export const signUp = async (email: string, password: string, name?: string) => {
-  // In a real implementation, this would call your backend API
-  const response = await fetch('/api/auth/signup', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password, name }),
-  });
-
-  if (response.ok) {
-    const data = await response.json();
-    localStorage.setItem('authToken', data.token);
-    return data;
-  } else {
-    throw new Error('Sign up failed');
-  }
-};
-
-export const signOut = () => {
-  localStorage.removeItem('authToken');
-};
-
-export const useSession = () => {
-  const [session, setSession] = useState<{ user: any; isLoading: boolean }>({
-    user: null,
-    isLoading: true
-  });
-
-  useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      // In a real implementation, you would validate the token with your backend
-      // For now, we'll just decode a mock user from localStorage
-      setSession({ user: { id: 1, email: 'user@example.com' }, isLoading: false });
-    } else {
-      setSession({ user: null, isLoading: false });
+  account: {
+    accountLinking: {
+      enabled: true,
     }
-  }, []);
+  },
 
-  return session;
-};
+  plugins: [
+    jwt({
+      jwt: { expirationTime: "7d" }
+    })
+  ],
+
+  socialProviders: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+  },
+
+  emailAndPassword: {
+    enabled: true,
+  },
+  
+  // ADD THIS: Ensures cookies are handled correctly on localhost
+  advanced: {
+    useSecureCookies: false, // Forces cookies to work on http://localhost
+  }
+});

@@ -1,6 +1,5 @@
-from sqlalchemy import create_engine
+from sqlmodel import SQLModel, create_engine, Session # Use SQLModel's create_engine
 from sqlalchemy.pool import QueuePool
-from sqlmodel import Session
 from sqlalchemy.exc import SQLAlchemyError
 from contextlib import contextmanager
 import os
@@ -9,18 +8,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database URL from environment variable
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("database_url")
 
-# Create engine with connection pooling settings appropriate for Neon
+# Use SQLModel's engine
 engine = create_engine(
     DATABASE_URL,
     poolclass=QueuePool,
     pool_size=5,
     max_overflow=10,
-    pool_pre_ping=True,  # Verify connections before use
-    pool_recycle=300,    # Recycle connections every 5 minutes
-    echo=False           # Set to True for SQL debugging
+    pool_pre_ping=True,
+    pool_recycle=300,
+    echo=False
 )
+
+# --- ADD THIS FUNCTION HERE ---
+def create_db_and_tables():
+    """Initializes the database and creates all tables defined in models"""
+    # This is what main.py was looking for!
+    SQLModel.metadata.create_all(engine)
+# ------------------------------
 
 def get_session():
     """Yield a database session"""
@@ -29,7 +35,7 @@ def get_session():
 
 @contextmanager
 def get_db_transaction():
-    """Context manager for database transactions with automatic rollback on exception."""
+    """Context manager for database transactions"""
     session = Session(engine)
     try:
         yield session
@@ -39,8 +45,3 @@ def get_db_transaction():
         raise
     finally:
         session.close()
-
-def execute_in_transaction(func, *args, **kwargs):
-    """Execute a function within a database transaction."""
-    with get_db_transaction() as session:
-        return func(session, *args, **kwargs)

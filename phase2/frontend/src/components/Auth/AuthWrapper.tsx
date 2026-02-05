@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
-  requireAuth?: boolean; // If true, redirects to login if not authenticated
+  requireAuth?: boolean;   // If true, redirects to login if not authenticated
   redirectIfAuth?: boolean; // If true, redirects to dashboard if authenticated
 }
 
@@ -18,30 +18,38 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({
   const { state } = useAuth();
   const router = useRouter();
 
+  // We determine authentication based on the presence of a user object
+  const isUserAuthenticated = !!state.user;
+
   useEffect(() => {
-    if (requireAuth && !state.isAuthenticated && !state.isLoading) {
+    // 1. Safety Check: Only act once loading is completely finished
+    if (state.isLoading) return;
+
+    if (requireAuth && !isUserAuthenticated) {
+      // User is NOT logged in but trying to access a protected page (Dashboard)
       router.push('/login');
-    } else if (redirectIfAuth && state.isAuthenticated && !state.isLoading) {
+    } else if (redirectIfAuth && isUserAuthenticated) {
+      // User IS logged in but trying to access an auth page (Login/Register)
       router.push('/dashboard');
     }
-  }, [state.isAuthenticated, state.isLoading, requireAuth, redirectIfAuth, router]);
+  }, [isUserAuthenticated, state.isLoading, requireAuth, redirectIfAuth, router]);
 
-  // Show loading state while checking authentication
+  // 2. Show loading state while Better Auth checks for a session cookie
   if (state.isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
+          <p className="text-gray-500 font-medium animate-pulse">Syncing Session...</p>
+        </div>
       </div>
     );
   }
 
-  // Don't render children if redirect is needed
-  if (
-    (requireAuth && !state.isAuthenticated) ||
-    (redirectIfAuth && state.isAuthenticated)
-  ) {
-    return null;
-  }
+  // 3. Prevent rendering children if a redirect is imminent
+  // This stops the "flicker" where the dashboard shows for 1ms before pushing to login
+  if (requireAuth && !isUserAuthenticated) return null;
+  if (redirectIfAuth && isUserAuthenticated) return null;
 
   return <>{children}</>;
 };

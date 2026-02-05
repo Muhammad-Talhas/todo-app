@@ -1,193 +1,106 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-
-interface User {
-  id: number;
-  email: string;
-  name?: string;
-}
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { authClient } from './better-auth-client';
 
 interface AuthState {
-  user: User | null;
+  user: any | null;
   token: string | null;
-  isAuthenticated: boolean;
   isLoading: boolean;
-}
-
-interface AuthAction {
-  type: string;
-  payload?: any;
+  error: string | null;
 }
 
 interface AuthContextType {
   state: AuthState;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name?: string) => Promise<void>;
-  logout: () => void;
-  setToken: (token: string) => void;
+  oauthLogin: (provider: 'google' | 'github') => Promise<void>;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
-
-const initialState: AuthState = {
-  user: null,
-  token: null,
-  isAuthenticated: false,
-  isLoading: true,
-};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const authReducer = (state: AuthState, action: AuthAction): AuthState => {
-  switch (action.type) {
-    case 'LOGIN_START':
-      return { ...state, isLoading: true };
-    case 'LOGIN_SUCCESS':
-      return {
-        ...state,
-        user: action.payload.user,
-        token: action.payload.token,
-        isAuthenticated: true,
-        isLoading: false,
-      };
-    case 'LOGIN_FAILURE':
-      return {
-        ...state,
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-      };
-    case 'SIGNUP_SUCCESS':
-      return {
-        ...state,
-        user: action.payload.user,
-        token: action.payload.token,
-        isAuthenticated: true,
-        isLoading: false,
-      };
-    case 'LOGOUT':
-      return {
-        ...initialState,
-        isLoading: false,
-      };
-    case 'SET_TOKEN':
-      return {
-        ...state,
-        token: action.payload,
-        isAuthenticated: !!action.payload,
-      };
-    case 'SET_LOADING':
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
-    default:
-      return state;
-  }
-};
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    token: null,
+    isLoading: true,
+    error: null,
+  });
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
-
-  const setToken = (token: string) => {
-    localStorage.setItem('authToken', token);
-    dispatch({ type: 'SET_TOKEN', payload: token });
-  };
-
-  const login = async (email: string, password: string) => {
-    dispatch({ type: 'LOGIN_START' });
+  const refreshSession = async () => {
     try {
-      // In a real implementation, this would call your backend API
-      // For now, we'll simulate the API call
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setToken(data.token);
-        dispatch({
-          type: 'LOGIN_SUCCESS',
-          payload: {
-            user: data.user,
-            token: data.token,
-          },
-        });
-      } else {
-        dispatch({ type: 'LOGIN_FAILURE' });
-        throw new Error('Login failed');
+      const { data, error } = await authClient.getSession();
+      if (error || !data) {
+        setState(prev => ({ ...prev, isLoading: false, user: null, token: null }));
+        return;
       }
-    } catch (error) {
-      dispatch({ type: 'LOGIN_FAILURE' });
-      throw error;
-    }
-  };
 
-  const signup = async (email: string, password: string, name?: string) => {
-    dispatch({ type: 'LOGIN_START' });
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
+      setState({
+        user: data.user,
+        // Better Auth standard structure: data.session.token
+        token: data.session?.token || (data as any).token || null,
+        isLoading: false,
+        error: null,
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setToken(data.token);
-        dispatch({
-          type: 'SIGNUP_SUCCESS',
-          payload: {
-            user: data.user,
-            token: data.token,
-          },
-        });
-      } else {
-        dispatch({ type: 'LOGIN_FAILURE' });
-        throw new Error('Signup failed');
-      }
-    } catch (error) {
-      dispatch({ type: 'LOGIN_FAILURE' });
-      throw error;
+    } catch (err) {
+      setState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('authToken');
-    dispatch({ type: 'LOGOUT' });
-  };
-
-  // Check for existing token on initial load
-  React.useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      // In a real implementation, you'd validate the token with your backend
-      // For now, we'll just set the token
-      dispatch({ type: 'SET_TOKEN', payload: token });
-    } else {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
+  useEffect(() => {
+    refreshSession();
   }, []);
 
-  const value = {
-    state,
-    login,
-    signup,
-    logout,
-    setToken,
+  // Renamed internally to 'signInWithEmail' to avoid ts(2451) conflict
+  const signInWithEmail = async (email: string, password: string) => {
+    const result = await authClient.signIn.email({
+      email,
+      password,
+    });
+
+    if (result.error) throw new Error(result.error.message);
+
+    if (result.data) {
+      setState({
+        user: result.data.user,
+        token: (result.data as any).token || (result.data as any).session?.token || null,
+        isLoading: false,
+        error: null,
+      });
+    }
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const oauthLogin = async (provider: 'google' | 'github') => {
+    try {
+      await authClient.signIn.social({
+        provider,
+        callbackURL: '/dashboard',
+      });
+    } catch (err) {
+      console.error("OAuth Error:", err);
+    }
+  };
+
+  const logout = async () => {
+    await authClient.signOut();
+    setState({ user: null, token: null, isLoading: false, error: null });
+    window.location.href = '/login';
+  };
+
+  return (
+    <AuthContext.Provider 
+      value={{ 
+        state, 
+        login: signInWithEmail, // Mapping the internal function to the 'login' key
+        oauthLogin, 
+        logout, 
+        refreshSession 
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

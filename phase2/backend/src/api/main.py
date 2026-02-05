@@ -1,5 +1,5 @@
 # src/api/main.py
-
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,13 +10,27 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.logging_config import app_logger, log_security_event, log_user_action
 from src.api.routes import tasks, auth
 from src.config import settings, get_settings
+from src.database import create_db_and_tables
+from src.models.user import User 
+from src.models.task import Task
+
+# Define the lifespan function
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # This code runs on startup
+    print("Starting up: Creating database tables...")
+    create_db_and_tables()
+    yield
+    # This code runs on shutdown (if needed)
+    print("Shutting down...")
 
 # Create FastAPI app instance
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Secure multi-user Todo API with JWT authentication",
-    debug=settings.debug
+    debug=settings.debug,
+    lifespan=lifespan 
 )
 
 # Setup CORS middleware
@@ -34,7 +48,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(tasks.router, prefix="/api/{user_id}", tags=["tasks"])
+app.include_router(tasks.router, prefix="/api")
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 # Exception handlers

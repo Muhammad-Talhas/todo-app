@@ -18,7 +18,9 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    if (token) {
+    // We send the token if it exists. The backend "Trust" logic 
+    // just needs to see this header to allow the request.
+    if (token && token.length > 0) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
@@ -34,11 +36,11 @@ class ApiClient {
     const url = `${this.config.baseUrl}${endpoint}`;
 
     const config: RequestInit = {
+      ...options,
       headers: {
         ...this.getAuthHeaders(token),
         ...options.headers,
       },
-      ...options,
     };
 
     try {
@@ -49,7 +51,13 @@ class ApiClient {
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorData}`);
       }
 
-      return await response.json();
+      // Handle empty responses or non-JSON responses
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+      }
+
+      return {} as T;
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
@@ -72,39 +80,45 @@ class ApiClient {
   };
 
   // Task methods
-  getTasks = (userId: number, token: string) => {
+  getTasks = (userId: string, token: string) => {
     return this.request(`/api/${userId}/tasks`, {
       method: 'GET',
     }, token);
   };
 
-  createTask = (userId: number, taskData: any, token: string) => {
-    return this.request(`/api/${userId}/tasks`, {
-      method: 'POST',
-      body: JSON.stringify(taskData),
-    }, token);
+  async createTask(userId: string, taskData: any) {
+  const sanitizedData = {
+    ...taskData,
+    // Convert empty string to null so the backend doesn't crash
+    due_date: taskData.due_date === "" ? null : taskData.due_date,
   };
 
-  getTask = (userId: number, taskId: number, token: string) => {
+  return this.request(`/api/${userId}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify(sanitizedData),
+  });
+}
+
+  getTask = (userId: string, taskId: number, token: string) => {
     return this.request(`/api/${userId}/tasks/${taskId}`, {
       method: 'GET',
     }, token);
   };
 
-  updateTask = (userId: number, taskId: number, taskData: any, token: string) => {
+  updateTask = (userId: string, taskId: number, taskData: any, token: string) => {
     return this.request(`/api/${userId}/tasks/${taskId}`, {
       method: 'PUT',
       body: JSON.stringify(taskData),
     }, token);
   };
 
-  deleteTask = (userId: number, taskId: number, token: string) => {
+  deleteTask = (userId: string, taskId: number, token: string) => {
     return this.request(`/api/${userId}/tasks/${taskId}`, {
       method: 'DELETE',
     }, token);
   };
 
-  updateTaskCompletion = (userId: number, taskId: number, completed: boolean, token: string) => {
+  updateTaskCompletion = (userId: string, taskId: number, completed: boolean, token: string) => {
     return this.request(`/api/${userId}/tasks/${taskId}/complete`, {
       method: 'PATCH',
       body: JSON.stringify({ completed }),
@@ -112,7 +126,7 @@ class ApiClient {
   };
 }
 
-// Create API client instance with base URL from environment
+// Create API client instance
 const apiClient = new ApiClient({
   baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
 });
