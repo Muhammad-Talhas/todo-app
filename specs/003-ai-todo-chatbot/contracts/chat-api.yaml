@@ -1,0 +1,84 @@
+openapi: 3.0.0
+info:
+  title: AI Todo Chatbot API
+  description: API for interacting with the AI-powered Todo Chatbot
+  version: 1.0.0
+
+paths:
+  /api/{user_id}/chat:
+    post:
+      summary: Send a chat message to the AI Todo Chatbot
+      description: Processes a natural language message and performs appropriate todo operations
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: The ID of the user making the request
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conversation_id:
+                  type: integer
+                  description: Existing conversation ID (optional, creates new if not provided)
+                  example: 123
+                message:
+                  type: string
+                  description: User's natural language input
+                  example: "Add a task to buy groceries"
+              required:
+                - message
+      responses:
+        '200':
+          description: Successful response from the chatbot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation_id:
+                    type: integer
+                    description: Identifier for the conversation
+                    example: 123
+                  response:
+                    type: string
+                    description: AI assistant's response to the user
+                    example: "I've added the task 'buy groceries' to your list."
+                  tool_calls:
+                    type: array
+                    description: List of MCP tools invoked during processing
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          description: Name of the tool called
+                          example: "add_task"
+                        arguments:
+                          type: object
+                          description: Arguments passed to the tool
+                          example:
+                            user_id: 1
+                            title: "buy groceries"
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+        '403':
+          description: Forbidden - User ID in token doesn't match path parameter
+        '500':
+          description: Internal server error
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+security:
+  - BearerAuth: []

@@ -26,4 +26,4 @@ const auth = betterAuth({
   },
 });
 
-export const $handle = auth.$handle;
+export const { handler } = auth;

@@ -13,6 +13,7 @@ interface AuthState {
 interface AuthContextType {
   state: AuthState;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name: string) => Promise<void>;
   oauthLogin: (provider: 'google' | 'github') => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -71,6 +72,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const signUpWithEmail = async (email: string, password: string, name: string) => {
+    const result = await authClient.signUp.email({
+      email,
+      password,
+      name,
+    });
+
+    if (result.error) throw new Error(result.error.message);
+
+    if (result.data) {
+      setState({
+        user: result.data.user,
+        token: (result.data as any).token || (result.data as any).session?.token || null,
+        isLoading: false,
+        error: null,
+      });
+    }
+  };
+
   const oauthLogin = async (provider: 'google' | 'github') => {
     try {
       await authClient.signIn.social({
@@ -92,7 +112,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <AuthContext.Provider 
       value={{ 
         state, 
-        login: signInWithEmail, // Mapping the internal function to the 'login' key
+        login: signInWithEmail,
+        signup: signUpWithEmail,
         oauthLogin, 
         logout, 
         refreshSession 
